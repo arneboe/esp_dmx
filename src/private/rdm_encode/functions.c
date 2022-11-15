@@ -1,5 +1,14 @@
 #include "functions.h"
+#include <string.h>
 
+/**
+ * @brief Encodes a DISC_UNIQUE_BRANCH response in the desired data buffer.
+ *
+ * @param[out] data The buffer in which to encode the response.
+ * @param preamble_len The length of the response preamble (max: 7).
+ * @param uid The RDM UID to encode into the response.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_disc_response(uint8_t *data, size_t preamble_len,
                                 const rdm_uid_t uid) {
   // Encode the RDM preamble and delimiter
@@ -28,6 +37,14 @@ size_t rdm_encode_disc_response(uint8_t *data, size_t preamble_len,
   return preamble_len + 17;
 }
 
+/**
+ * @brief Decodes a DISC_UNIQUE_BRANCH response.
+ *
+ * @param[in] data The buffer in which the data to decode is stored.
+ * @param[out] uid The decoded UID in the response.
+ * @return true if the data checksum was a valid.
+ * @return false if the data checksum was invalid.
+ */
 bool rdm_decode_disc_response(const uint8_t *data, rdm_uid_t *uid) {
   // Find the length of the discovery response preamble (0-7 bytes)
   int preamble_len = 0;
@@ -35,6 +52,9 @@ bool rdm_decode_disc_response(const uint8_t *data, rdm_uid_t *uid) {
     if (data[preamble_len] == RDM_DELIMITER) {
       break;
     }
+  }
+  if (data[preamble_len] != RDM_DELIMITER) {
+    return false;  // Not a valid discovery response
   }
 
   // Decode the 6-byte UID and get the packet sum
@@ -56,6 +76,15 @@ bool rdm_decode_disc_response(const uint8_t *data, rdm_uid_t *uid) {
   return (sum == checksum);
 }
 
+/**
+ * @brief Encodes an RDM header and checksum into the desired buffer. When
+ * encoding data, parameter data must be encoded before calling this function.
+ * Otherwise, the encoded checksum will be invalid.
+ *
+ * @param[out] data The buffer in which to encode the header.
+ * @param[in] header A pointer to an RDM header used to encode data.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_header(void *data, const rdm_header_t *header) {
   rdm_data_t *const rdm = data;
   rdm->sc = RDM_SC;
@@ -81,6 +110,14 @@ size_t rdm_encode_header(void *data, const rdm_header_t *header) {
   return RDM_BASE_PACKET_SIZE;
 }
 
+/**
+ * @brief Decodes an RDM header.
+ *
+ * @param[in] data The buffer in which the data to decode is stored.
+ * @param[out] header A pointer to an RDM header used to store decoded data.
+ * @return true if the data was a valid RDM packet.
+ * @return false if the data was invalid.
+ */
 bool rdm_decode_header(const void *data, rdm_header_t *header) {
   const rdm_data_t *const rdm = data;
   header->destination_uid = buf_to_uid(rdm->destination_uid);
@@ -104,6 +141,14 @@ bool rdm_decode_header(const void *data, rdm_header_t *header) {
   return (rdm->sc == RDM_SC && rdm->sub_sc == RDM_SUB_SC);
 }
 
+/**
+ * @brief Encodes RDM UIDs into the desired buffer.
+ *
+ * @param[out] data The buffer in which to encode the data.
+ * @param[in] uids A pointer to an array of UIDs to encode.
+ * @param size The size of the array of UIDs.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_uids(void *data, const rdm_uid_t *uids, size_t size) {
   size_t pdl = 0;
   for (int i = 0; i < size; ++i, pdl += 6) {
@@ -112,6 +157,15 @@ size_t rdm_encode_uids(void *data, const rdm_uid_t *uids, size_t size) {
   return pdl;
 }
 
+/**
+ * @brief Decodes RDM UIDs into the desired array.
+ *
+ * @param[in] data The buffer in which the data to decode is stored.
+ * @param[out] uids A pointer to an array of UIDs to store decoded data.
+ * @param size The size of the array of UIDs.
+ * @param pdl The length of the parameter data.
+ * @return The number of UIDs decoded.
+ */
 size_t rdm_decode_uids(const void *data, rdm_uid_t *const uids, size_t size,
                        size_t pdl) {
   size_t num_params = 0;
@@ -121,6 +175,13 @@ size_t rdm_decode_uids(const void *data, rdm_uid_t *const uids, size_t size,
   return num_params;
 }
 
+/**
+ * @brief Encodes RDM discovery mute parameters into the desired buffer.
+ *
+ * @param[out] data The buffer in which to encode the data.
+ * @param[in] param A pointer to a discovery mute parameter to encode.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_mute(void *data, const rdm_disc_mute_t *param) {
   size_t pdl = 2;
   struct rdm_disc_mute_data_t *const ptr = data;
@@ -135,6 +196,15 @@ size_t rdm_encode_mute(void *data, const rdm_disc_mute_t *param) {
   return pdl;
 }
 
+/**
+ * @brief Decodes RDM discovery mute parameters.
+ *
+ * @param[in] data The buffer in which the data to decode is stored.
+ * @param[out] param A pointer to a discovery mute parameter to store decoded
+ * data.
+ * @param pdl The length of the parameter data.
+ * @return The number of parameters decoded (always 1).
+ */
 size_t rdm_decode_mute(const void *data, rdm_disc_mute_t *param, size_t size,
                        size_t pdl) {
   const struct rdm_disc_mute_data_t *const ptr = data;
@@ -146,6 +216,14 @@ size_t rdm_decode_mute(const void *data, rdm_disc_mute_t *param, size_t size,
   return 1;
 }
 
+/**
+ * @brief Encode an array of 16-bit numbers into the desired array.
+ *
+ * @param[out] pd The buffer in which to encode the data.
+ * @param[in] data A pointer to an array of values to encode.
+ * @param size The size of the array of values.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_16bit(void *pd, const void *data, size_t size) {
   if (size > RDM_PACKET_MAX_PARAMS(uint16_t)) {
     // Don't encode more data than can fit in a single packet
@@ -163,6 +241,15 @@ size_t rdm_encode_16bit(void *pd, const void *data, size_t size) {
   return pdl;
 }
 
+/**
+ * @brief Decode an array of 16-bit numbers into the desired array.
+ *
+ * @param[in] pd A pointer to the parameter data to decode.
+ * @param[out] data A pointer to an array in which to store the decoded data.
+ * @param size The size of the array to store decoded data.
+ * @param pdl The length of the parameter data.
+ * @return The number of of values available to decode.
+ */
 size_t rdm_decode_16bit(const void *pd, void *data, size_t size, size_t pdl) {
   if (size > RDM_PDL_MAX_PARAMS(pdl, uint16_t)) {
     // Don't decode more data than can fit in a single packet
@@ -178,6 +265,14 @@ size_t rdm_decode_16bit(const void *pd, void *data, size_t size, size_t pdl) {
   return pdl / sizeof(uint16_t);
 }
 
+/**
+ * @brief Encode an array of 8-bit numbers into the desired array.
+ *
+ * @param[out] pd The buffer in which to encode the data.
+ * @param[in] data A pointer to an array of values to encode.
+ * @param size The size of the array of values.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_8bit(void *pd, const void *data, size_t size) {
   if (size > RDM_PACKET_MAX_PARAMS(uint8_t)) {
     // Don't encode more data than can fit in a single packet
@@ -195,6 +290,15 @@ size_t rdm_encode_8bit(void *pd, const void *data, size_t size) {
   return pdl;
 }
 
+/**
+ * @brief Decode an array of 8-bit numbers into the desired array.
+ *
+ * @param[in] pd A buffer in which the data to decode is stored.
+ * @param[out] data A pointer to an array in which to store the decoded data.
+ * @param size The size of the array to store decoded data.
+ * @param pdl The length of the parameter data.
+ * @return The number of of values available to be decoded.
+ */
 size_t rdm_decode_8bit(const void *pd, void *data, size_t size,
                        size_t pdl) {
   if (size > RDM_PDL_MAX_PARAMS(pdl, uint8_t)) {
@@ -210,6 +314,14 @@ size_t rdm_decode_8bit(const void *pd, void *data, size_t size,
   return pdl;
 }
 
+/**
+ * @brief Encode a string into the desired array.
+ * 
+ * @param[out] pd A buffer into which to encode the data.
+ * @param[in] data A pointer to an array of values to encode.
+ * @param size The size of the string.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_string(void *pd, const void *data, size_t size) {
   if (size > RDM_PACKET_MAX_PARAMS(char)) {
     size = RDM_PACKET_MAX_PARAMS(char);
@@ -232,6 +344,15 @@ size_t rdm_encode_string(void *pd, const void *data, size_t size) {
   return pdl;
 }
 
+/**
+ * @brief Decode a string from a buffer.
+ *
+ * @param pd A buffer in which the to decode is stored.
+ * @param data A pointer into which to store the decoded data.
+ * @param size The size of the buffer to store the decoded data.
+ * @param pdl The length of the parameter data.
+ * @return The number of characters that was decoded.
+ */
 size_t rdm_decode_string(const void *pd, void *data, size_t size, size_t pdl) {
   if (size > RDM_PDL_MAX_PARAMS(pdl, char)) {
     size = RDM_PDL_MAX_PARAMS(pdl, char);
@@ -244,28 +365,56 @@ size_t rdm_decode_string(const void *pd, void *data, size_t size, size_t pdl) {
   return pdl;
 }
 
+/**
+ * @brief Encodes RDM device info into the desired buffer.
+ *
+ * @param[out] pd The buffer in which to encode the data.
+ * @param[in] device_info A pointer to the device info data
+ * @return The number of bytes encoded.
+ */
+size_t rdm_encode_device_info_(void *pd, const rdm_device_info_t *const restrict device_info) {
+  rdm_device_info_data_t *const restrict ptr = pd;
+  ptr->major_rdm_version = device_info->major_rdm_version;
+  ptr->minor_rdm_version = device_info->minor_rdm_version;
+  ptr->model_id = bswap16(device_info->model_id);
+  ptr->coarse_product_category = device_info->coarse_product_category;
+  ptr->fine_product_category = device_info->fine_product_category;
+  ptr->software_version_id = bswap32(device_info->software_version_id);
+  ptr->footprint = bswap16(device_info->footprint);
+  ptr->current_personality = device_info->current_personality;
+  ptr->personality_count = device_info->personality_count;
+  ptr->start_address = device_info->start_address != -1
+                          ? bswap16(device_info->start_address)
+                          : 0xffff;
+  ptr->sub_device_count = bswap16(device_info->sub_device_count);
+  ptr->sensor_count = device_info->sensor_count;
+  return sizeof(rdm_device_info_data_t);
+}
+
+/**
+ * @brief Encodes RDM device info into the desired buffer.
+ *
+ * @param[out] pd The buffer in which to encode the data.
+ * @param[in] data A pointer to a discovery mute parameter to encode.
+ * @return The number of bytes encoded.
+ */
 size_t rdm_encode_device_info(void *pd, const void *data) {
   if (data != NULL) {
-    rdm_device_info_data_t *const restrict ptr = pd;
     const rdm_device_info_t *const restrict device_info = data;
-    ptr->major_rdm_version = device_info->major_rdm_version;
-    ptr->minor_rdm_version = device_info->minor_rdm_version;
-    ptr->model_id = bswap16(device_info->model_id);
-    ptr->coarse_product_category = device_info->coarse_product_category;
-    ptr->fine_product_category = device_info->fine_product_category;
-    ptr->software_version_id = bswap32(device_info->software_version_id);
-    ptr->footprint = bswap16(device_info->footprint);
-    ptr->current_personality = device_info->current_personality;
-    ptr->personality_count = device_info->personality_count;
-    ptr->start_address = device_info->start_address != -1
-                            ? bswap16(device_info->start_address)
-                            : 0xffff;
-    ptr->sub_device_count = bswap16(device_info->sub_device_count);
-    ptr->sensor_count = device_info->sensor_count;
+    return rdm_encode_device_info(pd, device_info);
   }
   return sizeof(rdm_device_info_data_t);
 }
 
+/**
+ * @brief Decodes RDM device info.
+ *
+ * @param[in] pd The buffer in which the data to decode is stored.
+ * @param[out] data A pointer to a device info parameter to store decoded data.
+ * @param size The size of the array to store decoded data.
+ * @param pdl The length of the parameter data.
+ * @return The number of parameters decoded (always 1).
+ */
 size_t rdm_decode_device_info(const void *pd, void *data, size_t size,
                               size_t pdl) {
   if (data != NULL) {
