@@ -15,19 +15,19 @@ bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footpr
 
 /** 
  * @param cb Will be invoked every time the dmx start address is changed. */
-void set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t cb);
+void rdm_client_set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t cb);
 
 /**
  * @param cb Will be invoked every time the indentify value changes.
  *           If the value is true, the device should identify itself (e.g. by blinking)
 */
-void set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb);
+void rdm_client_set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb);
 
 /**
  * @param cb Will be invoked every time the device label is changed.
  * @note the device label is **not** null-terminated
 */
-void set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb);
+void rdm_client_set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb);
 
 /**
  * This method should be called anytime a dmx-rdm message is received.

@@ -20,7 +20,7 @@ typedef struct rdm_client_parameters_t
 rdm_parameters_t rdm_parameters[DMX_NUM_MAX] = {0};
 rdm_client_parameters_t rdm_client_parameters[DMX_NUM_MAX] = {0};
 
-void set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t cb)
+void rdm_client_set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t cb)
 {
     if (dmx_num >= DMX_NUM_MAX)
     {
@@ -31,7 +31,7 @@ void set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t
     rdm_client_parameters[dmx_num].address_cb = cb;
 }
 
-void set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb)
+void rdm_client_set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb)
 {
     if (dmx_num >= DMX_NUM_MAX)
     {
@@ -42,7 +42,7 @@ void set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb)
     rdm_client_parameters[dmx_num].identify_cb = cb;
 }
 
-void set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb)
+void rdm_client_set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb)
 {
     if (dmx_num >= DMX_NUM_MAX)
     {
