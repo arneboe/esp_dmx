@@ -512,9 +512,11 @@ static size_t rdm_send_generic_request(
                  resp_header.pid != req_header.pid ||
                  resp_header.destination_uid != req_header.source_uid ||
                  resp_header.source_uid != req_header.destination_uid ||
+                 resp_header.sub_device != req_header.sub_device ||
+                 resp_header.tn != req_header.tn) {
         err = ESP_ERR_INVALID_RESPONSE;
       }
-      else
+      else 
       {
         err = ESP_OK;
 
@@ -556,10 +558,12 @@ static size_t rdm_send_generic_request(
         // Report response back to user
         if (response != NULL) {
           response->err = err;
+          response->type = resp_header.response_type;
+          response->num_params = response_val;
       }
     }
   }
-  else
+  } else
   {
     if (response != NULL)
     {
