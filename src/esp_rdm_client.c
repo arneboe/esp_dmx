@@ -7,18 +7,18 @@
 #include "private/rdm_encode/functions.h"
 #include <string.h>
 
-
 /**
  * All parameters of a rdm client device
-*/
-typedef struct rdm_client_parameters_t {
-  start_address_changed_cb_t address_cb;
+ */
+typedef struct rdm_client_parameters_t
+{
+    start_address_changed_cb_t address_cb;
+    identify_cb_t identify_cb;
+    label_changed_cb_t label_cb;
 } rdm_client_parameters_t;
-
 
 rdm_parameters_t rdm_parameters[DMX_NUM_MAX] = {0};
 rdm_client_parameters_t rdm_client_parameters[DMX_NUM_MAX] = {0};
-
 
 void set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t cb)
 {
@@ -29,7 +29,27 @@ void set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t
     }
 
     rdm_client_parameters[dmx_num].address_cb = cb;
-    rdm_client_parameters[dmx_num].address_cb(rdm_parameters[dmx_num].device_info.start_address);
+}
+
+void set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb)
+{
+    if (dmx_num >= DMX_NUM_MAX)
+    {
+        ESP_LOGE("rdm_client", "dmx_num too large");
+        return;
+    }
+
+    rdm_client_parameters[dmx_num].identify_cb = cb;
+}
+
+void set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb)
+{
+    if (dmx_num >= DMX_NUM_MAX)
+    {
+        ESP_LOGE("rdm_client", "dmx_num too large");
+        return;
+    }
+    rdm_client_parameters[dmx_num].label_cb = cb;
 }
 
 bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footprint, const char *device_label)
@@ -155,6 +175,14 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     ESP_LOGI("RDM DBG", "Sent SET DEVICE_LABEL response. label: %s, %d bytes", params->device_label, bytesSent);
                 }
                 break;
+                case RDM_PID_SUPPORTED_PARAMETERS:
+                {
+                    const uint16_t supported_params[] = {bswap16(RDM_PID_DEVICE_LABEL)};
+                    const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
+                                                                         RDM_PID_SUPPORTED_PARAMETERS, header.sub_device, supported_params, sizeof(supported_params));
+                    ESP_LOGI("RDM DBG", "Sent SET RDM_PID_SUPPORTED_PARAMETERS response. %d bytes", bytesSent);
+                }
+                break;
                 default:
                     ESP_LOGI("RDM DBG", "RDM_CC_GET_COMMAND unknown get pid: %04x", header.pid);
                     ESP_LOG_BUFFER_HEX("RDM", data, size);
@@ -170,21 +198,43 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     rdm_parameters[dmx_num].identify_device = ((uint8_t *)data)[24]; // FIXME find better way to get the address
                     const size_t bytesSent = rdm_send_set_command_ack_response(dmx_num, header.source_uid, header.tn, header.sub_device, RDM_PID_IDENTIFY_DEVICE);
                     ESP_LOGI("RDM DBG", "Set identify: %d", rdm_parameters[dmx_num].identify_device);
+                    if (rdm_client_parameters[dmx_num].identify_cb)
+                    {
+                        rdm_client_parameters[dmx_num].identify_cb(rdm_parameters[dmx_num].identify_device);
+                    }
                 }
                 break;
                 case RDM_PID_DMX_START_ADDRESS:
                 {
                     rdm_parameters_t *params = &rdm_parameters[dmx_num];
                     uint16_t addr;
-                    memcpy(&addr, data + 24, 2);  // FIXME find better way to get the address
+                    memcpy(&addr, data + 24, 2); // FIXME find better way to get the address
                     params->device_info.start_address = bswap16(addr);
                     const size_t bytesSent = rdm_send_set_command_ack_response(dmx_num, header.source_uid, header.tn, header.sub_device, RDM_PID_DMX_START_ADDRESS);
                     ESP_LOGI("RDM DBG", "Set start address: %d", params->device_info.start_address);
-                    if(rdm_client_parameters[dmx_num].address_cb)
+                    if (rdm_client_parameters[dmx_num].address_cb)
                     {
                         rdm_client_parameters[dmx_num].address_cb(params->device_info.start_address);
                     }
-
+                }
+                break;
+                case RDM_PID_DEVICE_LABEL:
+                {
+                    if (header.pdl > 32)
+                    {
+                        ESP_LOGE("RDM", "header.pdl too large: %d", header.pdl);
+                        return;
+                    }
+                    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+                    memset(params->device_label, 0, sizeof(params->device_label));
+                    memcpy(params->device_label, data + 24, header.pdl); // FIXME find better way to get the address
+                    params->device_label_len = header.pdl;
+                    rdm_send_set_command_ack_response(dmx_num, header.source_uid, header.tn, header.sub_device, RDM_PID_DEVICE_LABEL);
+                    ESP_LOGI("RDM DBG", "Set device label: %s", params->device_label);
+                    if(rdm_client_parameters[dmx_num].label_cb)
+                    {
+                        rdm_client_parameters[dmx_num].label_cb(params->device_label, params->device_label_len);
+                    }
                 }
                 break;
                 default:
