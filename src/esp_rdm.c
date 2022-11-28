@@ -727,6 +727,44 @@ size_t rdm_send_get_param_response(dmx_port_t dmx_num, rdm_uid_t uid, uint8_t tn
   return sent;
 }
 
+size_t rdm_send_mute_response(dmx_port_t dmx_num, rdm_uid_t uid, uint8_t tn, const rdm_disc_mute_t *mute_params)
+{
+  RDM_CHECK(dmx_num < DMX_NUM_MAX, 0, "dmx_num error");
+  RDM_CHECK(dmx_driver_is_installed(dmx_num), 0, "driver is not installed");
+
+  dmx_driver_t *const driver = dmx_driver[dmx_num];
+  xSemaphoreTakeRecursive(driver->mux, portMAX_DELAY);
+  dmx_wait_sent(dmx_num, portMAX_DELAY);
+
+  // Prepare the RDM message
+  rdm_data_t *rdm = (rdm_data_t *)driver->data.buffer;
+
+
+  size_t written = rdm_encode_mute(&rdm->pd, mute_params);
+  const size_t pdl = written;
+
+  rdm_header_t header = {
+      .destination_uid = uid,
+      .source_uid = rdm_get_uid(dmx_num),
+      .tn = tn,
+      // For Responder generated messages (GET_COMMAND_RESPONSE,
+      // SET_COMMAND_RESPONSE, and DISCOVERY_COMMAND_RESPONSE), this field is used
+      // as the Response Type field.
+      .port_id = RDM_RESPONSE_TYPE_ACK,
+      .message_count = 0,
+      .sub_device = 0,
+      .cc = RDM_CC_DISC_COMMAND_RESPONSE,
+      .pid = RDM_PID_DISC_MUTE,
+      .pdl = pdl,
+  };
+  
+  written += rdm_encode_header(rdm, &header);
+  const size_t sent = dmx_send(dmx_num, written);
+
+  xSemaphoreGiveRecursive(driver->mux);
+  return sent;  
+}
+
 size_t rdm_send_idenfiy_device_response(dmx_port_t dmx_num, rdm_uid_t uid, uint8_t tn, rdm_sub_device_t sub_device, bool identify)
 {
   RDM_CHECK(dmx_num < DMX_NUM_MAX, 0, "dmx_num error");
