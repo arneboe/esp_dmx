@@ -203,7 +203,6 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                 {
                 case RDM_PID_IDENTIFY_DEVICE:
                 {
-                    // TODO notify someone that identify changed!
                     rdm_parameters[dmx_num].identify_device = ((uint8_t *)data)[24]; // FIXME find better way to get the address
                     const size_t bytesSent = rdm_send_set_command_ack_response(dmx_num, header.source_uid, header.tn, header.sub_device, RDM_PID_IDENTIFY_DEVICE);
                     ESP_LOGI("RDM DBG", "Set identify: %d", rdm_parameters[dmx_num].identify_device);
