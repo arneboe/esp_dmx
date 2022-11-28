@@ -172,7 +172,7 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     const rdm_parameters_t *params = &rdm_parameters[dmx_num];
                     const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
                                                                          RDM_PID_DEVICE_LABEL, header.sub_device, params->device_label, params->device_label_len);
-                    ESP_LOGI("RDM DBG", "Sent SET DEVICE_LABEL response. label: %s, %d bytes", params->device_label, bytesSent);
+                    ESP_LOGI("RDM DBG", "Sent GET DEVICE_LABEL response. label: %s, %d bytes", params->device_label, bytesSent);
                 }
                 break;
                 case RDM_PID_SUPPORTED_PARAMETERS:
@@ -180,7 +180,16 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     const uint16_t supported_params[] = {bswap16(RDM_PID_DEVICE_LABEL)};
                     const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
                                                                          RDM_PID_SUPPORTED_PARAMETERS, header.sub_device, supported_params, sizeof(supported_params));
-                    ESP_LOGI("RDM DBG", "Sent SET RDM_PID_SUPPORTED_PARAMETERS response. %d bytes", bytesSent);
+                    ESP_LOGI("RDM DBG", "Sent GET RDM_PID_SUPPORTED_PARAMETERS response. %d bytes", bytesSent);
+                }
+                break;
+                case RDM_PID_DMX_START_ADDRESS:
+                {
+                    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+                    const uint16_t addr = bswap16(params->device_info.start_address);
+                    const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
+                                                                         RDM_PID_DMX_START_ADDRESS, header.sub_device, &addr, sizeof(addr));
+                    ESP_LOGI("RDM DBG", "Sent GET RDM_PID_DMX_START_ADDRESS response. %d bytes", bytesSent);
                 }
                 break;
                 default:
@@ -231,7 +240,7 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     params->device_label_len = header.pdl;
                     rdm_send_set_command_ack_response(dmx_num, header.source_uid, header.tn, header.sub_device, RDM_PID_DEVICE_LABEL);
                     ESP_LOGI("RDM DBG", "Set device label: %s", params->device_label);
-                    if(rdm_client_parameters[dmx_num].label_cb)
+                    if (rdm_client_parameters[dmx_num].label_cb)
                     {
                         rdm_client_parameters[dmx_num].label_cb(params->device_label, params->device_label_len);
                     }
@@ -249,30 +258,3 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
         }
     }
 }
-
-void rdm_client_set_device_info(dmx_port_t dmx_num, const rdm_device_info_t *info)
-{
-    //   if(dmx_num >= DMX_NUM_MAX)
-    //   {
-    //     ESP_LOGE("rdm_client", "dmx_num too large");
-    //     return;
-    //   }
-
-    //   rdm_parameters[dmx_num] = *info;
-}
-
-// void debugPrintRdm(const rdm_header_t header)
-// {
-//     switch (header.cc)
-//     {
-//     case RDM_CC_GET_COMMAND:
-//         ESP_LOGI("RDM DBG", " command class: GET_COMMAND");
-//         break;
-//     case RDM_CC_SET_COMMAND:
-//         ESP_LOGI("RDM DBG", " command class: SET_COMMAND");
-//         break;
-//     default:
-//         ESP_LOGI("RDM DBG", " command class: UNKNOWN %02x", header.cc);
-//     }
-//     ESP_LOGI("RDM DBG", " pid: %04x", header.pid);
-// }
