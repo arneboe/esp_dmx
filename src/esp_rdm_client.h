@@ -4,6 +4,10 @@
 #include "dmx_types.h"
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void (*start_address_changed_cb_t)(uint16_t);
 typedef void (*identify_cb_t)(bool);
 typedef void (*label_changed_cb_t)(const char*, size_t);
@@ -33,3 +37,7 @@ void rdm_client_set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb);
  * This method should be called anytime a dmx-rdm message is received.
 */
 void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPacket, const void *data, const uint16_t size);
+
+#ifdef __cplusplus
+}
+#endif
