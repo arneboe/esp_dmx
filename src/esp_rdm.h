@@ -80,7 +80,7 @@ inline bool rdm_uid_is_addressed_to(rdm_uid_t uid, rdm_uid_t addressee) {
  * @param buf A pointer to an RDM buffer.
  * @return The properly formatted RDM UID.
  */
-FORCE_INLINE_ATTR rdm_uid_t buf_to_uid(const void *buf) {
+static inline __attribute__((always_inline)) rdm_uid_t buf_to_uid(const void *buf) {
   rdm_uid_t val;
   ((uint8_t *)&val)[7] = 0;
   ((uint8_t *)&val)[6] = 0;
@@ -103,7 +103,7 @@ FORCE_INLINE_ATTR rdm_uid_t buf_to_uid(const void *buf) {
  * @param uid The 64-bit representation of the UID.
  * @return void* A pointer to the destination buffer.
  */
-FORCE_INLINE_ATTR void *uid_to_buf(void *buf, rdm_uid_t uid) {
+static inline __attribute__((always_inline)) void *uid_to_buf(void *buf, rdm_uid_t uid) {
   ((uint8_t *)buf)[0] = ((uint8_t *)&uid)[5];
   ((uint8_t *)buf)[1] = ((uint8_t *)&uid)[4];
   ((uint8_t *)buf)[2] = ((uint8_t *)&uid)[3];
