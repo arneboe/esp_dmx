@@ -7,6 +7,18 @@
 #include "private/rdm_encode/functions.h"
 #include <string.h>
 
+
+#define MAX_NUM_PERSONALITIES 10
+
+
+typedef struct rdm_client_personality_t
+{
+    uint16_t footprint;
+    char description[32];
+    uint8_t description_len;
+} rdm_client_personality_t;
+
+
 /**
  * All parameters of a rdm client device
  */
@@ -15,6 +27,8 @@ typedef struct rdm_client_parameters_t
     start_address_changed_cb_t address_cb;
     identify_cb_t identify_cb;
     label_changed_cb_t label_cb;
+    rdm_client_personality_t personalities[MAX_NUM_PERSONALITIES];
+    personality_changed_cb_t personality_cb;
 } rdm_client_parameters_t;
 
 rdm_parameters_t rdm_parameters[DMX_NUM_MAX] = {0};
@@ -42,6 +56,17 @@ void rdm_client_set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb)
     rdm_client_parameters[dmx_num].identify_cb = cb;
 }
 
+
+void rdm_client_set_personality_changed_cb(dmx_port_t dmx_num, personality_changed_cb_t cb)
+{
+    if (dmx_num >= DMX_NUM_MAX)
+    {
+        ESP_LOGE("rdm_client", "dmx_num too large");
+        return;
+    }    
+    rdm_client_parameters[dmx_num].personality_cb = cb;
+}
+
 void rdm_client_set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb)
 {
     if (dmx_num >= DMX_NUM_MAX)
@@ -52,7 +77,8 @@ void rdm_client_set_label_changed_cb(dmx_port_t dmx_num, label_changed_cb_t cb)
     rdm_client_parameters[dmx_num].label_cb = cb;
 }
 
-bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footprint, const char *device_label)
+bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footprint, const char *device_label,
+                     const char *personality_description)
 {
     if (dmx_num >= DMX_NUM_MAX)
     {
@@ -63,6 +89,12 @@ bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footpr
     if (strlen(device_label) > 31)
     {
         ESP_LOGE("rdm_client", "device_label too long. Max size is 31");
+        return false;
+    }
+
+    if(strlen(personality_description) > 31)
+    {
+        ESP_LOGE("rdm_client", "personality_description too long. Max size is 31");
         return false;
     }
 
@@ -85,7 +117,61 @@ bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footpr
     strcpy(params->device_label, device_label);
     params->device_label_len = strlen(device_label);
 
+    rdm_client_parameters_t* client_params = &rdm_client_parameters[dmx_num];
+
+    client_params->personalities[0].footprint = footprint;
+    client_params->personalities[0].description_len = strlen(personality_description);
+     client_params->personality_cb = NULL;
+    strcpy(client_params->personalities[0].description, personality_description);
+
     return true;
+}
+
+bool rdm_client_set_personality(dmx_port_t dmx_num, uint8_t personality)
+{
+    if (dmx_num >= DMX_NUM_MAX)
+    {
+        ESP_LOGE("rdm_client", "dmx_num too large");
+        return -1;
+    }   
+    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+    if(personality > params->device_info.personality_count)
+    {
+        ESP_LOGE("rdm_client", "personality too large");
+        return false;
+    }
+    params->device_info.current_personality = personality;
+    rdm_client_parameters_t* client_params = &rdm_client_parameters[dmx_num];
+    params->device_info.footprint = client_params->personalities[personality - 1].footprint;
+    return true;
+}
+
+int rdm_client_add_personality(dmx_port_t dmx_num, uint16_t footprint, const char* description)
+{
+    if (dmx_num >= DMX_NUM_MAX)
+    {
+        ESP_LOGE("rdm_client", "dmx_num too large");
+        return -1;
+    }
+    if(strlen(description) > 31)
+    {
+        ESP_LOGE("rdm_client", "description too long. Max size is 31");
+        return -1;
+    }
+
+    rdm_client_parameters_t* client_params = &rdm_client_parameters[dmx_num];
+    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+    if(params->device_info.personality_count >= MAX_NUM_PERSONALITIES)
+    {
+        ESP_LOGE("rdm_client", "max num personalities reached");
+        return -1;
+    }
+
+    client_params->personalities[params->device_info.personality_count].footprint = footprint;
+    client_params->personalities[params->device_info.personality_count].description_len = strlen(description);
+    strcpy(client_params->personalities[params->device_info.personality_count].description, description);    
+    params->device_info.personality_count++;
+    return params->device_info.personality_count;
 }
 
 void rdm_client_handle_discovery_command(dmx_port_t dmx_num, const rdm_header_t *header, const void *data, const uint16_t data_size)
@@ -177,7 +263,7 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                 break;
                 case RDM_PID_SUPPORTED_PARAMETERS:
                 {
-                    const uint16_t supported_params[] = {bswap16(RDM_PID_DEVICE_LABEL)};
+                    const uint16_t supported_params[] = {bswap16(RDM_PID_DEVICE_LABEL), bswap16(RDM_PID_DMX_PERSONALITY)};
                     const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
                                                                          RDM_PID_SUPPORTED_PARAMETERS, header.sub_device, supported_params, sizeof(supported_params));
                     ESP_LOGI("RDM DBG", "Sent GET RDM_PID_SUPPORTED_PARAMETERS response. %d bytes", bytesSent);
@@ -190,6 +276,42 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
                                                                          RDM_PID_DMX_START_ADDRESS, header.sub_device, &addr, sizeof(addr));
                     ESP_LOGI("RDM DBG", "Sent GET RDM_PID_DMX_START_ADDRESS response. %d bytes", bytesSent);
+                }
+                break;
+                case RDM_PID_DMX_PERSONALITY:
+                {
+                    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+                    const uint8_t data[] = {params->device_info.current_personality, params->device_info.personality_count};
+                    const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
+                                                                         RDM_PID_DMX_PERSONALITY, header.sub_device, data, sizeof(data));
+                    ESP_LOGI("RDM DBG", "Sent GET RDM_PID_DMX_PERSONALITY response. %d bytes", bytesSent);
+                }
+                break;
+                case RDM_PID_DMX_PERSONALITY_DESCRIPTION:
+                {
+                    const uint8_t requestedPersonality = ((uint8_t *)data)[24]; // FIXME find better way to get the address
+                    const uint8_t personalityIdx = requestedPersonality - 1;
+                    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+                    if(personalityIdx >= params->device_info.personality_count)
+                    {
+                        ESP_LOGE("rdm_client", "illegal personality");
+                    }
+
+                    rdm_client_parameters_t* client_params = &rdm_client_parameters[dmx_num];
+                    const uint16_t footprint = client_params->personalities[personalityIdx].footprint;
+                    const uint16_t footprintSwapped = bswap16(footprint);
+                    const char* description = client_params->personalities[personalityIdx].description;
+                    const size_t descriptionLen = client_params->personalities[personalityIdx].description_len;
+
+                    uint8_t data[35];
+                    data[0] = requestedPersonality;
+                    memcpy(&data[1], &footprintSwapped, 2);
+                    memcpy(&data[3], description, descriptionLen);
+
+                    const size_t bytesSent = rdm_send_get_param_response(dmx_num, header.source_uid, header.tn,
+                                                                         RDM_PID_DMX_PERSONALITY_DESCRIPTION, header.sub_device, data, 3 + descriptionLen);
+
+                    ESP_LOGI("RDM DBG", "Sent Get RDM_PID_DMX_PERSONALITY_DESCRIPTION response. personality: %d, footprint: %d, description: %s ", requestedPersonality, footprint, description);
                 }
                 break;
                 default:
@@ -243,6 +365,28 @@ void rdm_client_handle_rdm_message(dmx_port_t dmx_num, const dmx_packet_t *dmxPa
                     {
                         rdm_client_parameters[dmx_num].label_cb(params->device_label, params->device_label_len);
                     }
+                }
+                break;
+                case RDM_PID_DMX_PERSONALITY:
+                {
+                    if(header.pdl != 1)
+                    {
+                        ESP_LOGE("RDM", "header.pdl invalid: %d", header.pdl);
+                        return;
+                    }
+                    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+                    uint8_t personality = -1;
+                    memcpy(&personality, data + 24, header.pdl);
+                    rdm_send_set_command_ack_response(dmx_num, header.source_uid, header.tn, header.sub_device, RDM_PID_DMX_PERSONALITY);
+
+                    rdm_client_set_personality(dmx_num, personality);
+
+                    if(rdm_client_parameters[dmx_num].personality_cb != NULL)
+                    {
+                        rdm_client_parameters[dmx_num].personality_cb(params->device_info.current_personality);
+                    }
+
+                    ESP_LOGI("RDM DBG", "Set personality: %d", params->device_info.current_personality);
                 }
                 break;
                 default:

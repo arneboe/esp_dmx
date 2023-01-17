@@ -11,10 +11,19 @@ extern "C" {
 typedef void (*start_address_changed_cb_t)(uint16_t);
 typedef void (*identify_cb_t)(bool);
 typedef void (*label_changed_cb_t)(const char*, size_t);
+typedef void (*personality_changed_cb_t)(uint8_t personality);
 
 
 //TODO comment
-bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footprint, const char* device_label);
+bool rdm_client_init(dmx_port_t dmx_num, uint16_t start_address, uint16_t footprint, const char* device_label,
+                     const char *personality_description);
+
+/// returns the id of the personality, or -1 in case of error
+int rdm_client_add_personality(dmx_port_t dmx_num, uint16_t footprint, const char* description);
+
+bool rdm_client_set_personality(dmx_port_t dmx_num, uint8_t personality);
+
+void rdm_client_set_personality_changed_cb(dmx_port_t dmx_num, personality_changed_cb_t cb);
 
 
 /** 
