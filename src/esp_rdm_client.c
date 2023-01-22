@@ -8,7 +8,7 @@
 #include <string.h>
 
 
-#define MAX_NUM_PERSONALITIES 10
+#define MAX_NUM_PERSONALITIES 100
 
 
 typedef struct rdm_client_personality_t
