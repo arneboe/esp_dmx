@@ -45,6 +45,17 @@ void rdm_client_set_start_address_changed_cb(dmx_port_t dmx_num, start_address_c
     rdm_client_parameters[dmx_num].address_cb = cb;
 }
 
+void rdm_client_set_start_address(dmx_port_t dmx_num, uint16_t start_address)
+{
+    if (dmx_num >= DMX_NUM_MAX)
+    {
+        ESP_LOGE("rdm_client", "dmx_num too large");
+        return;
+    }
+    rdm_parameters_t *params = &rdm_parameters[dmx_num];
+    params->device_info.start_address = start_address;
+}
+
 void rdm_client_set_notify_cb(dmx_port_t dmx_num, identify_cb_t cb)
 {
     if (dmx_num >= DMX_NUM_MAX)

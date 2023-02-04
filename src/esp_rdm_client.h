@@ -26,6 +26,8 @@ bool rdm_client_set_personality(dmx_port_t dmx_num, uint8_t personality);
 void rdm_client_set_personality_changed_cb(dmx_port_t dmx_num, personality_changed_cb_t cb);
 
 
+void rdm_client_set_start_address(dmx_port_t dmx_num, uint16_t start_address);
+
 /** 
  * @param cb Will be invoked every time the dmx start address is changed. */
 void rdm_client_set_start_address_changed_cb(dmx_port_t dmx_num, start_address_changed_cb_t cb);
